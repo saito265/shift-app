@@ -275,33 +275,37 @@ with tab3:
             if d not in shifts_by_date:
                 shifts_by_date[d] = []
             shifts_by_date[d].append(sh)
-        day_headers = ["月", "火", "水", "木", "金", "土", "日"]
+      day_headers = ["月", "火", "水", "木", "金", "土", "日"]
+        day_colors = ["#333","#333","#333","#333","#333","#1565C0","#E53935"]
         cal = calendar.monthcalendar(year, month)
-        cols = st.columns(7)
-        for i, h in enumerate(day_headers):
-            hcolor = "#E53935" if h == "日" else "#1565C0" if h == "土" else "#333"
-            cols[i].markdown(f"<div style='text-align:center;font-weight:bold;color:{hcolor}'>{h}</div>", unsafe_allow_html=True)
+
+        html = "<table style='width:100%;border-collapse:collapse;font-size:11px'><tr>"
+        for h, hc in zip(day_headers, day_colors):
+            html += f"<th style='text-align:center;color:{hc};padding:4px 1px;border-bottom:1px solid #ddd'>{h}</th>"
+        html += "</tr>"
+
         for week in cal:
-            cols = st.columns(7)
+            html += "<tr style='vertical-align:top'>"
             for i, day in enumerate(week):
-                with cols[i]:
-                    if day == 0:
-                        st.markdown("<div style='min-height:80px'></div>", unsafe_allow_html=True)
-                    else:
-                        d_str = f"{year}-{month:02d}-{day:02d}"
-                        day_color = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#333"
-                        st.markdown(f"<div style='font-weight:bold;color:{day_color}'>{day}</div>", unsafe_allow_html=True)
-                        if d_str in shifts_by_date:
-                            for sh in shifts_by_date[d_str]:
-                                name = sh["スタッフ名"]["value"]
-                                s_str = sh["開始時刻"]["value"] or ""
-                                e_str = sh["終了時刻"]["value"] or ""
-                                color = get_staff_color(name, all_staff_names)
-                                st.markdown(
-                                    f"<div style='background:{color};color:white;border-radius:4px;"
-                                    f"padding:2px 4px;margin:2px 0;font-size:11px'>"
-                                    f"{name}<br>{s_str}〜{e_str}</div>",
-                                    unsafe_allow_html=True)
+                if day == 0:
+                    html += "<td style='padding:2px'></td>"
+                else:
+                    d_str = f"{year}-{month:02d}-{day:02d}"
+                    dc = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#333"
+                    cell = f"<div style='font-weight:bold;color:{dc};font-size:11px'>{day}</div>"
+                    if d_str in shifts_by_date:
+                        for sh in shifts_by_date[d_str]:
+                            name = sh["スタッフ名"]["value"]
+                            s_str = sh["開始時刻"]["value"] or ""
+                            e_str = sh["終了時刻"]["value"] or ""
+                            color = get_staff_color(name, all_staff_names)
+                            short_name = name.split()[0] if name else name
+                            cell += f"<div style='background:{color};color:white;border-radius:3px;padding:1px 2px;margin:1px 0;font-size:9px;line-height:1.3'>{short_name}<br>{s_str[:5]}~{e_str[:5]}</div>"
+                    html += f"<td style='padding:2px;border:1px solid #eee;min-height:50px'>{cell}</td>"
+            html += "</tr>"
+        html += "</table>"
+        st.markdown(html, unsafe_allow_html=True)
+
         st.markdown("---")
         st.subheader("日別詳細・編集")
         selected_date = st.date_input("日付を選択", value=today, key="month_detail_date")
