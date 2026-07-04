@@ -249,10 +249,9 @@ with tab3:
 
     else:
         today = date.today()
-        target_month = today.replace(day=1) + timedelta(days=32 * st.session_state.month_offset)
-        target_month = target_month.replace(day=1)
-        year = target_month.year
-        month = target_month.month
+        total_months = today.year * 12 + (today.month - 1) + st.session_state.month_offset
+        year = total_months // 12
+        month = total_months % 12 + 1
         _, last_day = calendar.monthrange(year, month)
         month_start = date(year, month, 1)
         month_end = date(year, month, last_day)
