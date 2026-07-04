@@ -32,19 +32,27 @@ def get_staff():
         params={"app": APP_STAFF})
     return [r for r in res.json()["records"] if r["在籍ステータス"]["value"] == "在籍中"]
 
-GCAL_ICS_URL = os.getenv("GCAL_ICS_URL")
+def get_gcal_url():
+    try:
+        if "GCAL_ICS_URL" in st.secrets:
+            return st.secrets["GCAL_ICS_URL"]
+    except Exception:
+        pass
+    return os.getenv("GCAL_ICS_URL")
 
 @st.cache_data(ttl=600)
 def get_gcal_events(start_iso, end_iso):
     """Googleカレンダーの限定公開URL(iCal)からイベントを取得。日付ごとの辞書で返す"""
-    if not GCAL_ICS_URL:
+    url = get_gcal_url()
+    if not url:
         return {}
     try:
         import icalendar
         import recurring_ical_events
         from zoneinfo import ZoneInfo
         jst = ZoneInfo("Asia/Tokyo")
-        res = requests.get(GCAL_ICS_URL, timeout=15)
+        res = requests.get(url, timeout=15)
+        res.raise_for_status()
         cal = icalendar.Calendar.from_ical(res.content)
         events = recurring_ical_events.of(cal).between(
             date.fromisoformat(start_iso), date.fromisoformat(end_iso) + timedelta(days=1))
@@ -61,8 +69,8 @@ def get_gcal_events(start_iso, end_iso):
                 label = title
             by_date.setdefault(d_str, []).append(label)
         return by_date
-    except Exception:
-        return {}
+    except Exception as e:
+        return {"_error": f"{type(e).__name__}: {e}"}
 
 def get_shifts():
     res = requests.get(f"{BASE_URL}/records.json",
@@ -216,6 +224,8 @@ with tab2:
 
 with tab3:
     view = st.radio("表示モード", ["📅 週間", "🗓️ 月間"], horizontal=True)
+    if not get_gcal_url():
+        st.caption("📌 Googleカレンダー：未連携（Secretsに GCAL_ICS_URL が読み込めていません）")
     all_shifts = get_shifts()
     all_staff_names = [s["氏名"]["value"] for s in get_staff()]
     staff_list = get_staff()
@@ -240,6 +250,9 @@ with tab3:
                        week_start <= date.fromisoformat(sh["勤務日"]["value"]) <= week_end]
         day_order = [f"{DAY_JA[i]} {(week_start+timedelta(days=i)).strftime('%m/%d')}" for i in range(7)]
         gcal_events = get_gcal_events(str(week_start), str(week_end))
+        gcal_err = gcal_events.pop("_error", None)
+        if gcal_err:
+            st.warning(f"Googleカレンダーの取得に失敗：{gcal_err}")
         if gcal_events:
             st.markdown("##### 📌 イベント（Googleカレンダー）")
             html_ev = "<table style='width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed'><tr>"
@@ -321,6 +334,9 @@ with tab3:
         for d in shifts_by_date:
             shifts_by_date[d].sort(key=lambda x: x["開始時刻"]["value"] or "99:99")
         gcal_events = get_gcal_events(str(month_start), str(month_end))
+        gcal_err = gcal_events.pop("_error", None)
+        if gcal_err:
+            st.warning(f"Googleカレンダーの取得に失敗：{gcal_err}")
         day_headers = ["月", "火", "水", "木", "金", "土", "日"]
         day_colors = ["#333","#333","#333","#333","#333","#1565C0","#E53935"]
         cal = calendar.monthcalendar(year, month)
