@@ -274,6 +274,8 @@ with tab3:
             if d not in shifts_by_date:
                 shifts_by_date[d] = []
             shifts_by_date[d].append(sh)
+        for d in shifts_by_date:
+            shifts_by_date[d].sort(key=lambda x: x["開始時刻"]["value"] or "99:99")
         day_headers = ["月", "火", "水", "木", "金", "土", "日"]
         day_colors = ["#333","#333","#333","#333","#333","#1565C0","#E53935"]
         cal = calendar.monthcalendar(year, month)
