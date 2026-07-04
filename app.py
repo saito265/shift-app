@@ -199,7 +199,7 @@ if "week_offset" not in st.session_state:
 if "month_offset" not in st.session_state:
     st.session_state.month_offset = 0
 
-tab1, tab2, tab3 = st.tabs(["スタッフ一覧", "シフト登録", "シフトカレンダー"])
+tab3, tab1, tab2 = st.tabs(["シフトカレンダー", "スタッフ一覧", "シフト登録"])
 
 with tab1:
     st.subheader("スタッフ一覧")
@@ -223,7 +223,7 @@ with tab2:
         st.success("登録しました！") if ok else st.error("登録に失敗しました。")
 
 with tab3:
-    view = st.radio("表示モード", ["📅 週間", "🗓️ 月間"], horizontal=True)
+    view = st.radio("表示モード", ["📅 週間", "🗓️ 月間"], horizontal=True, index=1)
     if not get_gcal_url():
         st.caption("📌 Googleカレンダー：未連携（Secretsに GCAL_ICS_URL が読み込めていません）")
     all_shifts = get_shifts()
