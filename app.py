@@ -32,6 +32,38 @@ def get_staff():
         params={"app": APP_STAFF})
     return [r for r in res.json()["records"] if r["在籍ステータス"]["value"] == "在籍中"]
 
+GCAL_ICS_URL = os.getenv("GCAL_ICS_URL")
+
+@st.cache_data(ttl=600)
+def get_gcal_events(start_iso, end_iso):
+    """Googleカレンダーの限定公開URL(iCal)からイベントを取得。日付ごとの辞書で返す"""
+    if not GCAL_ICS_URL:
+        return {}
+    try:
+        import icalendar
+        import recurring_ical_events
+        from zoneinfo import ZoneInfo
+        jst = ZoneInfo("Asia/Tokyo")
+        res = requests.get(GCAL_ICS_URL, timeout=15)
+        cal = icalendar.Calendar.from_ical(res.content)
+        events = recurring_ical_events.of(cal).between(
+            date.fromisoformat(start_iso), date.fromisoformat(end_iso) + timedelta(days=1))
+        by_date = {}
+        for ev in events:
+            title = str(ev.get("SUMMARY", "予定"))
+            dtstart = ev["DTSTART"].dt
+            if hasattr(dtstart, "hour"):  # 時刻あり
+                dtstart = dtstart.astimezone(jst)
+                d_str = dtstart.date().isoformat()
+                label = f"{dtstart.strftime('%H:%M')} {title}"
+            else:  # 終日イベント
+                d_str = dtstart.isoformat()
+                label = title
+            by_date.setdefault(d_str, []).append(label)
+        return by_date
+    except Exception:
+        return {}
+
 def get_shifts():
     res = requests.get(f"{BASE_URL}/records.json",
         headers={"X-Cybozu-API-Token": TOKEN_SHIFT},
@@ -207,6 +239,18 @@ with tab3:
         week_shifts = [sh for sh in all_shifts if sh["勤務日"]["value"] and
                        week_start <= date.fromisoformat(sh["勤務日"]["value"]) <= week_end]
         day_order = [f"{DAY_JA[i]} {(week_start+timedelta(days=i)).strftime('%m/%d')}" for i in range(7)]
+        gcal_events = get_gcal_events(str(week_start), str(week_end))
+        if gcal_events:
+            st.markdown("##### 📌 イベント（Googleカレンダー）")
+            html_ev = "<table style='width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed'><tr>"
+            for i in range(7):
+                d = week_start + timedelta(days=i)
+                evs = gcal_events.get(str(d), [])
+                hc = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#888"
+                cells = "".join(f"<div style='background:#FFF3CD;border-left:3px solid #F57C00;color:#5D4037;border-radius:3px;padding:2px 3px;margin:1px 0;font-size:10px;line-height:1.3;word-break:break-all'>{e}</div>" for e in evs)
+                html_ev += f"<td style='vertical-align:top;padding:2px;border:1px solid #eee'><div style='text-align:center;font-weight:bold;font-size:10px;color:{hc}'>{DAY_JA[i]} {d.strftime('%m/%d')}</div>{cells}</td>"
+            html_ev += "</tr></table>"
+            st.markdown(html_ev, unsafe_allow_html=True)
         if week_shifts:
             fig = go.Figure()
             staff_in_week = list(dict.fromkeys(sh["スタッフ名"]["value"] for sh in week_shifts))
@@ -276,6 +320,7 @@ with tab3:
             shifts_by_date[d].append(sh)
         for d in shifts_by_date:
             shifts_by_date[d].sort(key=lambda x: x["開始時刻"]["value"] or "99:99")
+        gcal_events = get_gcal_events(str(month_start), str(month_end))
         day_headers = ["月", "火", "水", "木", "金", "土", "日"]
         day_colors = ["#333","#333","#333","#333","#333","#1565C0","#E53935"]
         cal = calendar.monthcalendar(year, month)
@@ -294,6 +339,8 @@ with tab3:
                     d_str = f"{year}-{month:02d}-{day:02d}"
                     dc = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#333"
                     cell = f"<div style='font-weight:bold;color:{dc};font-size:11px'>{day}</div>"
+                    for ev in gcal_events.get(d_str, []):
+                        cell += f"<div style='background:#FFF3CD;border-left:3px solid #F57C00;color:#5D4037;border-radius:3px;padding:1px 2px;margin:1px 0;font-size:9px;line-height:1.3;word-break:break-all'>{ev}</div>"
                     if d_str in shifts_by_date:
                         for sh in shifts_by_date[d_str]:
                             name = sh["スタッフ名"]["value"]

@@ -3,3 +3,5 @@ requests
 python-dotenv
 plotly
 pandas
+icalendar
+recurring-ical-events
