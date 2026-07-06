@@ -287,7 +287,8 @@ with tab3:
                     text=f"{name}<br>{s_str}〜{e_str}<br>{stype}",
                     textposition="inside", insidetextanchor="middle",
                     hovertemplate=f"<b>{name}</b><br>{stype}<br>{s_str}〜{e_str}<extra></extra>",
-                    showlegend=False, offsetgroup=str(staff_idx), width=bar_width,
+                    showlegend=False, width=bar_width,
+                    offset=-0.4 + staff_idx * bar_width,
                 ))
             if week_start <= today <= week_end:
                 t_idx = (today - week_start).days
