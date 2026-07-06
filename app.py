@@ -261,7 +261,8 @@ with tab3:
                 evs = gcal_events.get(str(d), [])
                 hc = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#888"
                 cells = "".join(f"<div style='background:#FFF3CD;border-left:3px solid #F57C00;color:#5D4037;border-radius:3px;padding:2px 3px;margin:1px 0;font-size:10px;line-height:1.3;word-break:break-all'>{e}</div>" for e in evs)
-                html_ev += f"<td style='vertical-align:top;padding:2px;border:1px solid #eee'><div style='text-align:center;font-weight:bold;font-size:10px;color:{hc}'>{DAY_JA[i]} {d.strftime('%m/%d')}</div>{cells}</td>"
+                td_bg = "background:#E3F2FD;border:2px solid #64B5F6" if d == today else "border:1px solid #eee"
+                html_ev += f"<td style='vertical-align:top;padding:2px;{td_bg}'><div style='text-align:center;font-weight:bold;font-size:10px;color:{hc}'>{DAY_JA[i]} {d.strftime('%m/%d')}</div>{cells}</td>"
             html_ev += "</tr></table>"
             st.markdown(html_ev, unsafe_allow_html=True)
         if week_shifts:
@@ -288,6 +289,10 @@ with tab3:
                     hovertemplate=f"<b>{name}</b><br>{stype}<br>{s_str}〜{e_str}<extra></extra>",
                     showlegend=False, offsetgroup=str(staff_idx), width=bar_width,
                 ))
+            if week_start <= today <= week_end:
+                t_idx = (today - week_start).days
+                fig.add_vrect(x0=t_idx - 0.5, x1=t_idx + 0.5, fillcolor="#64B5F6",
+                    opacity=0.15, layer="below", line_width=0)
             fig.update_layout(
                 barmode="group", bargroupgap=0.1,
                 xaxis=dict(categoryorder="array", categoryarray=day_order, tickfont=dict(size=13)),
@@ -365,7 +370,9 @@ with tab3:
                             color = get_staff_color(name, all_staff_names)
                             short_name = name.split()[0] if name else name
                             cell += f"<div style='background:{color};color:white;border-radius:3px;padding:1px 2px;margin:1px 0;font-size:9px;line-height:1.3'>{short_name}<br>{s_str[:5]}~{e_str[:5]}</div>"
-                    html += f"<td style='padding:2px;border:1px solid #eee;min-height:50px'>{cell}</td>"
+                    is_today = (d_str == str(today))
+                    td_style = "padding:2px;border:2px solid #64B5F6;background:#E3F2FD;min-height:50px" if is_today else "padding:2px;border:1px solid #eee;min-height:50px"
+                    html += f"<td style='{td_style}'>{cell}</td>"
             html += "</tr>"
         html += "</table>"
         st.markdown(html, unsafe_allow_html=True)
