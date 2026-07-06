@@ -253,58 +253,65 @@ with tab3:
         gcal_err = gcal_events.pop("_error", None)
         if gcal_err:
             st.warning(f"Googleカレンダーの取得に失敗：{gcal_err}")
-        if gcal_events:
-            st.markdown("##### 📌 イベント（Googleカレンダー）")
-            html_ev = "<table style='width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed'><tr>"
-            for i in range(7):
-                d = week_start + timedelta(days=i)
-                evs = gcal_events.get(str(d), [])
-                hc = "#E53935" if i == 6 else "#1565C0" if i == 5 else "#888"
-                cells = "".join(f"<div style='background:#FFF3CD;border-left:3px solid #F57C00;color:#5D4037;border-radius:3px;padding:2px 3px;margin:1px 0;font-size:10px;line-height:1.3;word-break:break-all'>{e}</div>" for e in evs)
-                td_bg = "background:#E3F2FD;border:2px solid #64B5F6" if d == today else "border:1px solid #eee"
-                html_ev += f"<td style='vertical-align:top;padding:2px;{td_bg}'><div style='text-align:center;font-weight:bold;font-size:10px;color:{hc}'>{DAY_JA[i]} {d.strftime('%m/%d')}</div>{cells}</td>"
-            html_ev += "</tr></table>"
-            st.markdown(html_ev, unsafe_allow_html=True)
         if week_shifts:
             fig = go.Figure()
-            staff_in_week = list(dict.fromkeys(sh["スタッフ名"]["value"] for sh in week_shifts))
-            n_staff = len(staff_in_week)
-            bar_width = 0.8 / n_staff
+            shifts_by_day = {}
             for sh in week_shifts:
                 d = date.fromisoformat(sh["勤務日"]["value"])
+                shifts_by_day.setdefault(d, []).append(sh)
+            for d, day_shifts in shifts_by_day.items():
+                day_shifts.sort(key=lambda x: x["開始時刻"]["value"] or "99:99")
                 day_idx = (d - week_start).days
-                s_str = sh["開始時刻"]["value"] or "00:00"
-                e_str = sh["終了時刻"]["value"] or "00:00"
-                name = sh["スタッフ名"]["value"]
-                stype = sh["シフト区分"]["value"] or "その他"
-                s_h = int(s_str[:2]) + int(s_str[3:5]) / 60
-                e_h = int(e_str[:2]) + int(e_str[3:5]) / 60
-                color = get_staff_color(name, all_staff_names)
-                staff_idx = staff_in_week.index(name)
-                fig.add_trace(go.Bar(
-                    name=name, x=[day_idx], y=[e_h - s_h], base=[s_h],
-                    marker_color=color, marker_line=dict(color="white", width=1),
-                    text=f"{name}<br>{s_str}〜{e_str}<br>{stype}",
-                    textposition="inside", insidetextanchor="middle",
-                    hovertemplate=f"<b>{name}</b><br>{stype}<br>{s_str}〜{e_str}<extra></extra>",
-                    showlegend=False, width=bar_width,
-                    offset=-0.4 + staff_idx * bar_width,
-                ))
+                w = 0.8 / len(day_shifts)
+                for pos, sh in enumerate(day_shifts):
+                    s_str = sh["開始時刻"]["value"] or "00:00"
+                    e_str = sh["終了時刻"]["value"] or "00:00"
+                    name = sh["スタッフ名"]["value"]
+                    stype = sh["シフト区分"]["value"] or "その他"
+                    s_h = int(s_str[:2]) + int(s_str[3:5]) / 60
+                    e_h = int(e_str[:2]) + int(e_str[3:5]) / 60
+                    color = get_staff_color(name, all_staff_names)
+                    fig.add_trace(go.Bar(
+                        name=name, x=[day_idx], y=[e_h - s_h], base=[s_h],
+                        marker_color=color, marker_line=dict(color="white", width=1),
+                        text=f"{name}<br>{s_str}〜{e_str}<br>{stype}",
+                        textposition="inside", insidetextanchor="middle",
+                        hovertemplate=f"<b>{name}</b><br>{stype}<br>{s_str}〜{e_str}<extra></extra>",
+                        showlegend=False, width=w,
+                        offset=-0.4 + pos * w,
+                    ))
+            # Googleカレンダーのイベントをグラフ上部に表示（列ズレしないようグラフ内に描画）
+            ev_rows = max((len(gcal_events.get(str(week_start + timedelta(days=i)), [])) for i in range(7)), default=0)
+            y_top = 7 - 0.9 * ev_rows - 0.1 if ev_rows else 7
+            for i in range(7):
+                for j, ev in enumerate(gcal_events.get(str(week_start + timedelta(days=i)), [])):
+                    label = ev if len(ev) <= 14 else ev[:13] + "…"
+                    fig.add_annotation(x=i, y=6.55 - 0.9 * (ev_rows - 1 - j),
+                        text=label, showarrow=False,
+                        font=dict(size=9, color="#5D4037"),
+                        bgcolor="#FFF3CD", bordercolor="#F57C00", borderwidth=1,
+                        hovertext=ev)
             if week_start <= today <= week_end:
                 t_idx = (today - week_start).days
                 fig.add_vrect(x0=t_idx - 0.5, x1=t_idx + 0.5, fillcolor="#64B5F6",
                     opacity=0.15, layer="below", line_width=0)
             fig.update_layout(
-                barmode="group", bargroupgap=0.1,
+                barmode="group",
                 xaxis=dict(tickvals=list(range(7)), ticktext=day_order,
                     range=[-0.5, 6.5], tickfont=dict(size=13)),
-                yaxis=dict(range=[22, 7], tickvals=list(range(7, 23)),
+                yaxis=dict(range=[22, y_top], tickvals=list(range(7, 23)),
                     ticktext=[f"{h}:00" for h in range(7, 23)], title="時刻", gridcolor="#EEE"),
-                height=550, plot_bgcolor="#FAFAFA",
+                height=550 + 30 * ev_rows, plot_bgcolor="#FAFAFA",
                 margin=dict(l=60, r=20, t=20, b=40), showlegend=False,
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
+            if gcal_events:
+                st.markdown("##### 📌 イベント（Googleカレンダー）")
+                for i in range(7):
+                    d = week_start + timedelta(days=i)
+                    for ev in gcal_events.get(str(d), []):
+                        st.markdown(f"- {DAY_JA[i]} {d.strftime('%m/%d')}：{ev}")
             st.info("この週にシフトはありません。")
         st.markdown("---")
         st.subheader("日別詳細・編集")
