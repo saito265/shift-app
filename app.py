@@ -272,7 +272,7 @@ with tab3:
             bar_width = 0.8 / n_staff
             for sh in week_shifts:
                 d = date.fromisoformat(sh["勤務日"]["value"])
-                day_label = f"{DAY_JA[d.weekday()]} {d.strftime('%m/%d')}"
+                day_idx = (d - week_start).days
                 s_str = sh["開始時刻"]["value"] or "00:00"
                 e_str = sh["終了時刻"]["value"] or "00:00"
                 name = sh["スタッフ名"]["value"]
@@ -282,7 +282,7 @@ with tab3:
                 color = get_staff_color(name, all_staff_names)
                 staff_idx = staff_in_week.index(name)
                 fig.add_trace(go.Bar(
-                    name=name, x=[day_label], y=[e_h - s_h], base=[s_h],
+                    name=name, x=[day_idx], y=[e_h - s_h], base=[s_h],
                     marker_color=color, marker_line=dict(color="white", width=1),
                     text=f"{name}<br>{s_str}〜{e_str}<br>{stype}",
                     textposition="inside", insidetextanchor="middle",
@@ -296,7 +296,8 @@ with tab3:
                     opacity=0.15, layer="below", line_width=0)
             fig.update_layout(
                 barmode="group", bargroupgap=0.1,
-                xaxis=dict(categoryorder="array", categoryarray=day_order, tickfont=dict(size=13)),
+                xaxis=dict(tickvals=list(range(7)), ticktext=day_order,
+                    range=[-0.5, 6.5], tickfont=dict(size=13)),
                 yaxis=dict(range=[22, 7], tickvals=list(range(7, 23)),
                     ticktext=[f"{h}:00" for h in range(7, 23)], title="時刻", gridcolor="#EEE"),
                 height=550, plot_bgcolor="#FAFAFA",
